@@ -1,14 +1,10 @@
 package main
 
 import (
-  "bytes"
   "fmt"
   "log"
-  "net/http"
-  "strconv"
   "time"
   "encoding/json"
-  // "io/ioutil"
   "os"
 
   linuxproc "github.com/c9s/goprocinfo/linux"
@@ -57,13 +53,7 @@ type MonitoringData  struct {
 
 func main() {
   time_interval := 1 // this number represents seconds
-  push_to_influx := false
   print_std_out := false
-  // targetFileName := "current_status_tmp"
-
-  influxUrl := "http://10.143.0.218:8086"
-  cpuDBname := "pi_cpu"
-  memoDBname := "pi_memo"
 
   currCPUStats := readCPUStats()
   prevCPUStats := readCPUStats()
@@ -85,20 +75,6 @@ func main() {
       fmt.Printf("CPU stats: %+v", coreStats)
     }
 
-    if push_to_influx {
-      url := influxUrl + "/write?db=" + cpuDBname
-      body := []byte("cpu0,coreID=0 value=" + strconv.FormatFloat(float64(coreStats.cpu0), 'f', -1, 32) + "\n" +
-        "cpu1,coreID=1 value=" + strconv.FormatFloat(float64(coreStats.cpu0), 'f', -1, 32) + "\n" +
-        "cpu2,coreID=2 value=" + strconv.FormatFloat(float64(coreStats.cpu0), 'f', -1, 32) + "\n" +
-        "cpu3,coreID=3 value=" + strconv.FormatFloat(float64(coreStats.cpu0), 'f', -1, 32))
-      // fmt.Printf("%s", body)
-      req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
-      hc := http.Client{}
-      _, err = hc.Do(req)
-      if err != nil {
-        log.Fatal("could not send POST")
-      }
-    }
     prevCPUStats = currCPUStats
 
     //
@@ -116,22 +92,6 @@ func main() {
 
     if print_std_out {
       fmt.Printf(" | Memory info: %+v\n", mmInfo)
-    }
-
-    if push_to_influx {
-      url := influxUrl + "/write?db=" + memoDBname
-      body := []byte("TotalMachine,memTag=TotalMachine value=" + strconv.Itoa(int(mmInfo.TotalMachine)) + "\n" +
-        "TotalUsed,memTag=TotalUsed value=" + strconv.Itoa(int(mmInfo.TotalUsed)) + "\n" +
-        "Buffers,memTag=Buffers value=" + strconv.Itoa(int(mmInfo.Buffers)) + "\n" +
-        "Cached,memTag=Cached value=" + strconv.Itoa(int(mmInfo.Cached)) + "\n" +
-        "NonCacheNonBuffers,memTag=NonCacheNonBuffers value=" + strconv.Itoa(int(mmInfo.NonCacheNonBuffers)))
-
-      req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
-      hc := http.Client{}
-      _, err = hc.Do(req)
-      if err != nil {
-        log.Fatal("could not send POST")
-      }
     }
 
     monitoringData := MonitoringData {
