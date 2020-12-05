@@ -7,6 +7,9 @@ import (
   "net/http"
   "strconv"
   "time"
+  "encoding/json"
+  // "io/ioutil"
+  "os"
 
   linuxproc "github.com/c9s/goprocinfo/linux"
 )
@@ -38,10 +41,25 @@ type MyMemoInfo struct {
   NonCacheNonBuffers uint64
 }
 
+//
+// memory values are read from the /proc/meminfo pseudo-file with the help of the goprocinfo package...
+// how are they calculated? Like 'htop' command, see question:
+//   - http://stackoverflow.com/questions/41224738/how-to-calculate-memory-usage-from-proc-meminfo-like-htop/
+//
+
+type MonitoringData  struct {
+  Cpu0          float32   `json:"cpu0"`
+  Cpu1          float32   `json:"cpu1"`
+  Cpu2          float32   `json:"cpu2"`
+  Cpu3          float32   `json:"cpu3"`
+  MemoryUsage   uint64    `json:"memoryUsage"`
+}
+
 func main() {
   time_interval := 1 // this number represents seconds
   push_to_influx := false
-  print_std_out := true
+  print_std_out := false
+  // targetFileName := "current_status_tmp"
 
   influxUrl := "http://10.143.0.218:8086"
   cpuDBname := "pi_cpu"
@@ -69,10 +87,10 @@ func main() {
 
     if push_to_influx {
       url := influxUrl + "/write?db=" + cpuDBname
-      body := []byte("cpu0,coreID=0 value=" + strconv.FormatFloat(float64(coreStats.Cpu0), 'f', -1, 32) + "\n" +
-        "cpu1,coreID=1 value=" + strconv.FormatFloat(float64(coreStats.Cpu0), 'f', -1, 32) + "\n" +
-        "cpu2,coreID=2 value=" + strconv.FormatFloat(float64(coreStats.Cpu0), 'f', -1, 32) + "\n" +
-        "cpu3,coreID=3 value=" + strconv.FormatFloat(float64(coreStats.Cpu0), 'f', -1, 32))
+      body := []byte("cpu0,coreID=0 value=" + strconv.FormatFloat(float64(coreStats.cpu0), 'f', -1, 32) + "\n" +
+        "cpu1,coreID=1 value=" + strconv.FormatFloat(float64(coreStats.cpu0), 'f', -1, 32) + "\n" +
+        "cpu2,coreID=2 value=" + strconv.FormatFloat(float64(coreStats.cpu0), 'f', -1, 32) + "\n" +
+        "cpu3,coreID=3 value=" + strconv.FormatFloat(float64(coreStats.cpu0), 'f', -1, 32))
       // fmt.Printf("%s", body)
       req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
       hc := http.Client{}
@@ -115,8 +133,29 @@ func main() {
         log.Fatal("could not send POST")
       }
     }
+
+    monitoringData := MonitoringData {
+      Cpu0: coreStats.cpu0,
+      Cpu1: coreStats.cpu1,
+      Cpu2: coreStats.cpu2,
+      Cpu3: coreStats.cpu3,
+      MemoryUsage: mmInfo.TotalUsed}
+
+    jsonMonitoringData, _ := json.Marshal(monitoringData)
+    fmt.Println(string(jsonMonitoringData))
+
+    fileToOutput, err := os.Create("current_status.json")
+    check(err)
+    defer fileToOutput.Close()
+
+    fileToOutput.WriteString(string(jsonMonitoringData))
+    fileToOutput.Sync()
   }
 }
+
+
+// -------------- END OF MAIN ------------------
+
 
 func readCPUStats() *linuxproc.Stat {
   stat, err := linuxproc.ReadStat("/proc/stat")
@@ -191,6 +230,8 @@ func readMemoInfo() *linuxproc.MemInfo {
   return info
 }
 
-func createJsonFor() {
-
+func check(e error) {
+    if e != nil {
+        panic(e)
+    }
 }
