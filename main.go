@@ -18,10 +18,10 @@ import (
 //
 
 type MyCPUStats struct {
-  Cpu0 float32
-  Cpu1 float32
-  Cpu2 float32
-  Cpu3 float32
+  cpu0 float32
+  cpu1 float32
+  cpu2 float32
+  cpu3 float32
 }
 
 //
@@ -39,8 +39,7 @@ type MyMemoInfo struct {
 }
 
 func main() {
-
-  time_interval := 15 // this number represents seconds
+  time_interval := 1 // this number represents seconds
   push_to_influx := false
   print_std_out := true
 
@@ -48,9 +47,11 @@ func main() {
   cpuDBname := "pi_cpu"
   memoDBname := "pi_memo"
 
-  currCPUStats := ReadCPUStats()
-  prevCPUStats := ReadCPUStats()
-  info := ReadMemoInfo()
+  currCPUStats := readCPUStats()
+  prevCPUStats := readCPUStats()
+  info := readMemoInfo()
+
+  fmt.Println("Monitoring started")
 
   for {
     time.Sleep(time.Second * time.Duration(time_interval))
@@ -59,7 +60,7 @@ func main() {
     //  CPU stuff below...
     //
 
-    currCPUStats = ReadCPUStats()
+    currCPUStats = readCPUStats()
     coreStats := calcMyCPUStats(currCPUStats, prevCPUStats)
 
     if print_std_out {
@@ -86,7 +87,7 @@ func main() {
     //  Memory stuff below...
     //
 
-    info = ReadMemoInfo()
+    info = readMemoInfo()
 
     var mmInfo MyMemoInfo
     mmInfo.TotalMachine = info.MemTotal
@@ -114,53 +115,50 @@ func main() {
         log.Fatal("could not send POST")
       }
     }
-
   }
-
 }
 
-func ReadCPUStats() *linuxproc.Stat {
+func readCPUStats() *linuxproc.Stat {
   stat, err := linuxproc.ReadStat("/proc/stat")
   if err != nil {
     log.Fatal("stat read fail")
   }
+
   return stat
 }
 
 func calcMyCPUStats(curr, prev *linuxproc.Stat) *MyCPUStats {
-
   var stats MyCPUStats
 
-  stats.Cpu0 = calcSingleCoreUsage(curr.CPUStats[0], prev.CPUStats[0])
-  stats.Cpu1 = calcSingleCoreUsage(curr.CPUStats[1], prev.CPUStats[1])
-  stats.Cpu2 = calcSingleCoreUsage(curr.CPUStats[2], prev.CPUStats[2])
-  stats.Cpu3 = calcSingleCoreUsage(curr.CPUStats[3], prev.CPUStats[3])
+  stats.cpu0 = calcSingleCoreUsage(curr.CPUStats[0], prev.CPUStats[0])
+  stats.cpu1 = calcSingleCoreUsage(curr.CPUStats[1], prev.CPUStats[1])
+  stats.cpu2 = calcSingleCoreUsage(curr.CPUStats[2], prev.CPUStats[2])
+  stats.cpu3 = calcSingleCoreUsage(curr.CPUStats[3], prev.CPUStats[3])
 
 
   return &stats
 }
 
+/*
+ *    source: http://stackoverflow.com/questions/23367857/accurate-calculation-of-cpu-usage-given-in-percentage-in-linux
+ *
+ *    PrevIdle = previdle + previowait
+ *    Idle = idle + iowait
+ *
+ *    PrevNonIdle = prevuser + prevnice + prevsystem + previrq + prevsoftirq + prevsteal
+ *    NonIdle = user + nice + system + irq + softirq + steal
+ *
+ *    PrevTotal = PrevIdle + PrevNonIdle
+ *    Total = Idle + NonIdle
+ *
+ *    # differentiate: actual value minus the previous one
+ *    totald = Total - PrevTotal
+ *    idled = Idle - PrevIdle
+ *
+ *    CPU_Percentage = (totald - idled)/totald
+ */
+
 func calcSingleCoreUsage(curr, prev linuxproc.CPUStat) float32 {
-
-  /*
-   *    source: http://stackoverflow.com/questions/23367857/accurate-calculation-of-cpu-usage-given-in-percentage-in-linux
-   *
-   *    PrevIdle = previdle + previowait
-   *    Idle = idle + iowait
-   *
-   *    PrevNonIdle = prevuser + prevnice + prevsystem + previrq + prevsoftirq + prevsteal
-   *    NonIdle = user + nice + system + irq + softirq + steal
-   *
-   *    PrevTotal = PrevIdle + PrevNonIdle
-   *    Total = Idle + NonIdle
-   *
-   *    # differentiate: actual value minus the previous one
-   *    totald = Total - PrevTotal
-   *    idled = Idle - PrevIdle
-   *
-   *    CPU_Percentage = (totald - idled)/totald
-   */
-
   PrevIdle := prev.Idle + prev.IOWait
   Idle := curr.Idle + curr.IOWait
 
@@ -184,10 +182,15 @@ func calcSingleCoreUsage(curr, prev linuxproc.CPUStat) float32 {
 //
 //
 
-func ReadMemoInfo() *linuxproc.MemInfo {
+func readMemoInfo() *linuxproc.MemInfo {
   info, err := linuxproc.ReadMemInfo("/proc/meminfo")
   if err != nil {
     log.Fatal("info read fail")
   }
+
   return info
+}
+
+func createJsonFor() {
+
 }
